@@ -1,0 +1,14 @@
+# Terraform caches in any subdir
+**/.terraform/
+**/.terraform/*
+
+# Local state (only ignore if you use remote state!)
+*.tfstate
+*.tfstate.*
+
+# Logs
+crash.log
+crash.*.log
+
+# Keep the lockfile tracked (important for reproducible providers)
+!.terraform.lock.hcl
