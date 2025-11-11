@@ -19,3 +19,16 @@ variable "tags" {
   default = {}
 }
 variable "region" { type = string }
+
+variable "alb_certificate_arn" {
+  description = "ACM certificate ARN in the same region as the ALB (for HTTPS listener)"
+  type        = string
+  default     = ""
+}
+
+
+variable "health_check_path" {
+  description = "Target group health check path"
+  type        = string
+  default     = "/"
+}

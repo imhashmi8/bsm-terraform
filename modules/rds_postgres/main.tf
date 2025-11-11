@@ -69,8 +69,9 @@ resource "aws_db_instance" "this" {
   # Maintenance & backups
   backup_retention_period      = var.backup_retention
   deletion_protection          = var.deletion_protection
-  skip_final_snapshot          = false
+  skip_final_snapshot          = var.skip_final_snapshot
   copy_tags_to_snapshot        = true
+   final_snapshot_identifier = var.skip_final_snapshot ? null : var.final_snapshot_identifier
   auto_minor_version_upgrade   = true
 
   # DB name and params

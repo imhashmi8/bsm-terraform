@@ -44,12 +44,21 @@ resource "aws_iam_role" "task" {
 resource "aws_security_group" "alb" {
   name   = "${var.name}-alb-sg"
   vpc_id = var.vpc_id
+
   ingress {
     protocol    = "tcp"
     from_port   = 80
     to_port     = 80
     cidr_blocks = ["0.0.0.0/0"]
   }
+  # allow HTTPS as well (harmless if HTTPS listener not created yet)
+  ingress {
+    protocol    = "tcp"
+    from_port   = 443
+    to_port     = 443
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
   egress {
     protocol    = "-1"
     from_port   = 0
@@ -58,6 +67,7 @@ resource "aws_security_group" "alb" {
   }
   tags = var.tags
 }
+
 
 resource "aws_security_group" "svc" {
   name   = "${var.name}-svc-sg"
@@ -93,22 +103,60 @@ resource "aws_lb_target_group" "tg" {
   port        = var.container_port
   protocol    = "HTTP"
   target_type = "ip"
+
   health_check {
-    path    = "/"
+    path    = var.health_check_path   # was "/"
     matcher = "200-399"
   }
+
   tags = var.tags
 }
 
+
+# HTTP :80 listener
+# HTTP :80 listener
 resource "aws_lb_listener" "http" {
   load_balancer_arn = aws_lb.this.arn
   port              = 80
   protocol          = "HTTP"
+
+  # If a cert is supplied, redirect to HTTPS. Otherwise, forward to TG (HTTP-only mode).
+  dynamic "default_action" {
+    for_each = var.alb_certificate_arn != "" ? [1] : []
+    content {
+      type = "redirect"
+      redirect {
+        port        = "443"
+        protocol    = "HTTPS"
+        status_code = "HTTP_301"
+      }
+    }
+  }
+
+  dynamic "default_action" {
+    for_each = var.alb_certificate_arn == "" ? [1] : []
+    content {
+      type             = "forward"
+      target_group_arn = aws_lb_target_group.tg.arn
+    }
+  }
+}
+
+# HTTPS :443 listener (created only if a cert is provided)
+resource "aws_lb_listener" "https" {
+  count             = var.alb_certificate_arn != "" ? 1 : 0
+  load_balancer_arn = aws_lb.this.arn
+  port              = 443
+  protocol          = "HTTPS"
+  ssl_policy        = "ELBSecurityPolicy-TLS13-1-2-2021-06"
+  certificate_arn   = var.alb_certificate_arn
+
   default_action {
     type             = "forward"
     target_group_arn = aws_lb_target_group.tg.arn
   }
 }
+
 
 # Task & Service
 resource "aws_ecs_task_definition" "app" {

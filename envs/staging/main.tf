@@ -18,7 +18,11 @@ module "ecs" {
   desired_count      = 2
   container_port     = 80
   image              = "${module.ecr.repository_url}:latest"
-  tags               = var.tags
+
+  # ✅ Enable HTTPS on ALB (ap-south-1 cert)
+  alb_certificate_arn = "arn:aws:acm:ap-south-1:877634772120:certificate/07c88d89-531d-4437-b3ca-8e553ca9aefc"
+
+  tags = var.tags
 }
 
 module "ecr" {
@@ -35,14 +39,66 @@ module "rds" {
   allowed_sg_ids     = [module.ecs.service_sg_id]
 
   engine_version        = "15.13"
-  instance_class        = "db.t4g.small" # 2 vCPU, 2 GiB
+  instance_class        = "db.t4g.small"
   allocated_storage     = 20
   max_allocated_storage = 100
 
   multi_az             = false
   backup_retention     = 3
   deletion_protection  = false
+  skip_final_snapshot  = true
   performance_insights = false
   db_name              = "bsmstgdb"
   tags                 = var.tags
+}
+
+# ---------------- S3 + CloudFront (staging) ----------------
+module "frontend" {
+  source = "../../modules/frontend_static"
+  name   = "bsm-stg"
+
+  site_bucket_name    = "bsm-stg-frontend"
+  uploads_bucket_name = "bsm-stg-uploads"
+
+  # ✅ CF will talk to ALB using your API hostname over HTTPS
+  alb_domain_name  = "api.dev.biharsportsmahasangram.in"
+  api_path_pattern = "/api/*"
+
+  # ✅ CF custom domain + us-east-1 certificate
+  aliases             = ["dev.biharsportsmahasangram.in"]
+  acm_certificate_arn = "arn:aws:acm:us-east-1:877634772120:certificate/55cd2353-4498-4bb3-b831-82e7f113fcfa"
+
+  tags = var.tags
+}
+
+# ---------------- Route 53 DNS Records (staging) ----------------
+
+# Use your existing public hosted zone
+data "aws_route53_zone" "main" {
+  name         = "biharsportsmahasangram.in."
+  private_zone = false
+}
+
+# ✅ API hostname -> ALB (so CF origin host matches ALB cert)
+resource "aws_route53_record" "api_stg" {
+  zone_id = data.aws_route53_zone.main.zone_id
+  name    = "api.dev.biharsportsmahasangram.in"
+  type    = "A"
+  alias {
+    name                   = module.ecs.alb_dns_name
+    zone_id                = module.ecs.alb_zone_id
+    evaluate_target_health = false
+  }
+}
+
+# ✅ Frontend hostname -> CloudFront
+resource "aws_route53_record" "frontend_stg" {
+  zone_id = data.aws_route53_zone.main.zone_id
+  name    = "dev.biharsportsmahasangram.in"
+  type    = "A"
+  alias {
+    name                   = module.frontend.distribution_domain_name
+    zone_id                = module.frontend.distribution_hosted_zone_id
+    evaluate_target_health = false
+  }
 }

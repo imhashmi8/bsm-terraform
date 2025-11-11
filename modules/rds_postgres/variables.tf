@@ -77,3 +77,15 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
+
+variable "skip_final_snapshot" {
+  type        = bool
+  default     = true   # dev/staging default
+  description = "Skip final snapshot on deletion"
+}
+
+variable "final_snapshot_identifier" {
+  type        = string
+  default     = ""
+  description = "Final snapshot id when skip_final_snapshot = false"
+}
