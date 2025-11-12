@@ -16,11 +16,12 @@ module "ecs" {
   public_subnet_ids  = module.vpc.public_subnet_ids
   private_subnet_ids = module.vpc.private_subnet_ids
   desired_count      = 2
-  container_port     = 80
+  container_port     = 8080
   image              = "${module.ecr.repository_url}:latest"
 
   # ✅ Enable HTTPS on ALB (ap-south-1 cert)
   alb_certificate_arn = "arn:aws:acm:ap-south-1:877634772120:certificate/07c88d89-531d-4437-b3ca-8e553ca9aefc"
+  health_check_path = "/api/test/health"
 
   tags = var.tags
 }
