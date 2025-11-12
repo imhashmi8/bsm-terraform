@@ -54,25 +54,25 @@ module "rds" {
 }
 
 # ---------------- Frontend: S3 + CloudFront (PROD) ----------------
-module "frontend" {
-  source              = "../../modules/frontend_static"
-  name                = "bsm-prod"
+# module "frontend" {
+#   source              = "../../modules/frontend_static"
+#   name                = "bsm-prod"
 
-  # S3 buckets (must be globally unique)
-  site_bucket_name    = "bsm-prod-frontend"
-  uploads_bucket_name = "bsm-prod-uploads" # or "" to skip uploads origin
+#   # S3 buckets (must be globally unique)
+#   site_bucket_name    = "bsm-prod-frontend"
+#   uploads_bucket_name = "bsm-prod-uploads" # or "" to skip uploads origin
 
-  # ✅ CloudFront origin uses API hostname (matches ALB cert)
-  alb_domain_name  = "api.biharsportsmahasangram.in"
-  api_path_pattern = "/api/*"
+#   # ✅ CloudFront origin uses API hostname (matches ALB cert)
+#   alb_domain_name  = "api.biharsportsmahasangram.in"
+#   api_path_pattern = "/api/*"
 
-  # ✅ Custom domains on CloudFront (us-east-1 cert)
-  aliases             = ["biharsportsmahasangram.in", "www.biharsportsmahasangram.in"]
-  acm_certificate_arn = "arn:aws:acm:us-east-1:877634772120:certificate/615fd047-95fa-4712-a5b0-6fe6d33fe915"
+#   # ✅ Custom domains on CloudFront (us-east-1 cert)
+#   aliases             = ["biharsportsmahasangram.in", "www.biharsportsmahasangram.in"]
+#   acm_certificate_arn = "arn:aws:acm:us-east-1:877634772120:certificate/615fd047-95fa-4712-a5b0-6fe6d33fe915"
 
-  price_class = "PriceClass_100"
-  tags        = var.tags
-}
+#   price_class = "PriceClass_100"
+#   tags        = var.tags
+# }
 
 # ---------------- Route 53 Alias for PROD ----------------
 data "aws_route53_zone" "main" {
@@ -114,4 +114,32 @@ resource "aws_route53_record" "frontend_www" {
     zone_id                = module.frontend.distribution_hosted_zone_id
     evaluate_target_health = false
   }
+}
+
+# Frontend ECR repository
+module "ecr_frontend" {
+  source = "../../modules/ecr"
+  name   = "bsm-prod-frontend"
+  tags   = var.tags
+}
+
+# Frontend ECS service (nginx serving React)
+module "frontend_ecs" {
+  source             = "../../modules/ecs_alb_service"
+  name               = "bsm-prod-frontend"
+  region             = var.region
+  vpc_id             = module.vpc.vpc_id
+  public_subnet_ids  = module.vpc.public_subnet_ids
+  private_subnet_ids = module.vpc.private_subnet_ids
+  desired_count      = 2
+
+  # nginx serves the built SPA on container port 80
+  container_port     = 80
+  image              = "${module.ecr_frontend.repository_url}:latest"
+
+  # keep health check simple for nginx SPA
+  health_check_path  = "/"
+
+  # we do not need an ALB cert specifically for the container; ALB listeners are shared
+  tags = var.tags
 }

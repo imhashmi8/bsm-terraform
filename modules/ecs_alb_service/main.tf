@@ -24,6 +24,32 @@ data "aws_iam_policy_document" "assume" {
   }
 }
 
+resource "aws_iam_policy" "task_s3_upload" {
+  name   = "${var.name}-task-s3-upload"
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect   = "Allow"
+      Action   = [
+        "s3:PutObject",
+        "s3:GetObject",
+        "s3:DeleteObject",
+        "s3:ListBucket"
+      ]
+      Resource = [
+        "arn:aws:s3:::bsm-stg-uploads-unique",
+        "arn:aws:s3:::bsm-stg-uploads-unique/*"
+      ]
+    }]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "task_attach_s3" {
+  role       = aws_iam_role.task.name
+  policy_arn = aws_iam_policy.task_s3_upload.arn
+}
+
+
 resource "aws_iam_role" "exec" {
   name               = "${var.name}-exec"
   assume_role_policy = data.aws_iam_policy_document.assume.json
