@@ -20,10 +20,9 @@ module "ecs" {
   image              = "${module.ecr.repository_url}:latest"
 
   # ✅ Enable HTTPS on ALB (ap-south-1 cert for API hostname)
-  alb_certificate_arn = "arn:aws:acm:ap-south-1:877634772120:certificate/07c88d89-531d-4437-b3ca-8e553ca9aefc"
+  alb_certificate_arn = "arn:aws:acm:ap-south-1:877634772120:certificate/bc95b265-bc74-490b-ae1a-36d19b3c8ac4"
   health_check_path = "/api/test/health"
-
-  tags = var.tags
+ tags = var.tags
 }
 
 module "ecr" {
@@ -69,7 +68,7 @@ module "frontend" {
 
   # ✅ Custom domains on CloudFront (us-east-1 cert)
   aliases             = ["biharsportsmahasangram.in", "www.biharsportsmahasangram.in"]
-  acm_certificate_arn = "arn:aws:acm:us-east-1:877634772120:certificate/55cd2353-4498-4bb3-b831-82e7f113fcfa"
+  acm_certificate_arn = "arn:aws:acm:us-east-1:877634772120:certificate/615fd047-95fa-4712-a5b0-6fe6d33fe915"
 
   price_class = "PriceClass_100"
   tags        = var.tags
